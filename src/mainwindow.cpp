@@ -26,13 +26,6 @@ TaskDetailsDialog::TaskDetailsDialog(const Task& task, QWidget* parent)
 
     QVBoxLayout* layout = new QVBoxLayout(this);
 
-    // 标题
-    QLabel* titleLabel = new QLabel("标题:", this);
-    titleEdit = new QLineEdit(this);
-    titleEdit->setText(task.title);
-    layout->addWidget(titleLabel);
-    layout->addWidget(titleEdit);
-
     // 描述
     QLabel* descLabel = new QLabel("描述:", this);
     descriptionEdit = new QLineEdit(this);
@@ -68,7 +61,6 @@ TaskDetailsDialog::TaskDetailsDialog(const Task& task, QWidget* parent)
 
 Task TaskDetailsDialog::getTask() const {
     Task result = task;
-    result.title = titleEdit->text();
     result.description = descriptionEdit->text();
     result.details = detailsEdit->toPlainText();
     result.progress = progressSpinBox->value();

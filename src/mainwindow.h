@@ -23,7 +23,6 @@ public:
 
 private:
     Task task;
-    QLineEdit* titleEdit;
     QLineEdit* descriptionEdit;
     QTextEdit* detailsEdit;
     QSpinBox* progressSpinBox;
@@ -72,7 +71,6 @@ private slots:
     void onTaskSelectionChanged();
     void onStatusFilterChanged(int index);
     void onViewTaskDetails();
-    void onViewTaskDetails();
 
 private:
     void setupUI();
@@ -93,7 +91,6 @@ private:
     QPushButton* deleteButton;
     QPushButton* upButton;
     QPushButton* downButton;
-    QPushButton* detailsButton;
     QPushButton* detailsButton;
 };
 
