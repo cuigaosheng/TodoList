@@ -14,6 +14,7 @@
 #include <QSpinBox>
 #include <QDialogButtonBox>
 #include <QTextEdit>
+#include <QTextEdit>
 
 // TaskDetailsDialog 实现
 TaskDetailsDialog::TaskDetailsDialog(const Task& task, QWidget* parent)
