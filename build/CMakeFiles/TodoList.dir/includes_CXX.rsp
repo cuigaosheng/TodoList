@@ -1,0 +1,1 @@
+-IC:/Users/cuiga/TodoList/build -IC:/Users/cuiga/TodoList -IC:/Users/cuiga/TodoList/build/TodoList_autogen/include -isystem C:/Qt/6.11.0/mingw_64/include/QtCore -isystem C:/Qt/6.11.0/mingw_64/include -isystem "C:/Qt/6.11.0/mingw_64/mkspecs/win32-g++" -isystem C:/Qt/6.11.0/mingw_64/include/QtGui -isystem C:/Qt/6.11.0/mingw_64/include/QtWidgets

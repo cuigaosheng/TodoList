@@ -1,0 +1,5 @@
+C:/Users/cuiga/TodoList/build-win/CMakeFiles/TodoList.dir
+C:/Users/cuiga/TodoList/build-win/CMakeFiles/edit_cache.dir
+C:/Users/cuiga/TodoList/build-win/CMakeFiles/rebuild_cache.dir
+C:/Users/cuiga/TodoList/build-win/CMakeFiles/TodoList_autogen_timestamp_deps.dir
+C:/Users/cuiga/TodoList/build-win/CMakeFiles/TodoList_autogen.dir

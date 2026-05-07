@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where cmake:*)",
+      "Bash(where qmake:*)",
+      "Bash(powershell:*)",
+      "Bash(cmake:*)",
+      "Bash(rm:*)",
+      "Bash(where:*)",
+      "Bash(wsl which:*)",
+      "Bash(wsl bash:*)",
+      "Bash(qmake:*)",
+      "Bash(\"C:\\\\Qt\\\\Tools\\\\CMake_64\\\\bin\\\\cmake.exe\" ..:*)",
+      "Bash(\"C:\\\\Qt\\\\Tools\\\\Ninja\\\\ninja.exe\":*)",
+      "Bash(taskkill:*)",
+      "Bash(tasklist:*)",
+      "Bash(lsof:*)",
+      "Bash(wmic process:*)",
+      "Bash(find .:*)",
+      "Bash(ls:*)",
+      "Bash(export:*)",
+      "Bash(mkdir:*)",
+      "Bash(./QRCodeGenerator.exe:*)",
+      "Bash(cp:*)",
+      "Bash(pacman:*)",
+      "Bash(python3:*)",
+      "Bash(curl:*)"
+    ]
+  }
+}
