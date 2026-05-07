@@ -410,6 +410,36 @@ void MainWindow::onTaskSelectionChanged() {
     deleteButton->setEnabled(hasSelection);
     upButton->setEnabled(hasSelection);
     downButton->setEnabled(hasSelection);
+    detailsButton->setEnabled(hasSelection);
+}
+
+void MainWindow::onViewTaskDetails() {
+    QListWidgetItem* item = taskListWidget->currentItem();
+    if (!item) {
+        QMessageBox::warning(this, "警告", "请先选择一个任务");
+        return;
+    }
+
+    QString id = item->data(Qt::UserRole).toString();
+    Task task = taskManager.getTask(id);
+
+    TaskDetailsDialog dialog(task, this);
+    if (dialog.exec() == QDialog::Accepted) {
+        Task updatedTask = dialog.getTask();
+
+        // 根据进度自动改变状态
+        if (updatedTask.progress == 0) {
+            updatedTask.status = TaskStatus::Todo;
+        } else if (updatedTask.progress == 100) {
+            updatedTask.status = TaskStatus::Done;
+        } else {
+            updatedTask.status = TaskStatus::InProgress;
+        }
+
+        taskManager.updateTask(updatedTask);
+        saveTasks();
+        refreshTaskList();
+    }
 }
 
 void MainWindow::onStatusFilterChanged(int index) {

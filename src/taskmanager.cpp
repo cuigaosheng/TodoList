@@ -135,6 +135,7 @@ QJsonObject Task::toJson() const {
     obj["id"] = id;
     obj["title"] = title;
     obj["description"] = description;
+    obj["details"] = details;
     obj["status"] = static_cast<int>(status);
     obj["progress"] = progress;
     return obj;
@@ -145,6 +146,7 @@ Task Task::fromJson(const QJsonObject& obj) {
     task.id = obj["id"].toString();
     task.title = obj["title"].toString();
     task.description = obj["description"].toString();
+    task.details = obj["details"].toString();
     task.status = static_cast<TaskStatus>(obj["status"].toInt());
     task.progress = obj["progress"].toInt(0);
     return task;

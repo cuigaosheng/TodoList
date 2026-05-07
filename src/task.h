@@ -14,6 +14,7 @@ struct Task {
     QString id;
     QString title;
     QString description;
+    QString details;   // 任务详情
     TaskStatus status;
     int progress;  // 0-100
 

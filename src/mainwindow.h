@@ -10,7 +10,24 @@
 #include <QDialog>
 #include <QLineEdit>
 #include <QSpinBox>
+#include <QTextEdit>
 #include "taskmanager.h"
+
+// 任务详情对话框
+class TaskDetailsDialog : public QDialog {
+    Q_OBJECT
+
+public:
+    TaskDetailsDialog(const Task& task, QWidget* parent = nullptr);
+    Task getTask() const;
+
+private:
+    Task task;
+    QLineEdit* titleEdit;
+    QLineEdit* descriptionEdit;
+    QTextEdit* detailsEdit;
+    QSpinBox* progressSpinBox;
+};
 
 // 编辑任务对话框
 class EditTaskDialog : public QDialog {
@@ -54,6 +71,7 @@ private slots:
     void onTaskDoubleClicked(QListWidgetItem* item);
     void onTaskSelectionChanged();
     void onStatusFilterChanged(int index);
+    void onViewTaskDetails();
 
 private:
     void setupUI();
@@ -74,6 +92,7 @@ private:
     QPushButton* deleteButton;
     QPushButton* upButton;
     QPushButton* downButton;
+    QPushButton* detailsButton;
 };
 
 #endif // MAINWINDOW_H
