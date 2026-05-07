@@ -13,6 +13,66 @@
 #include <QLineEdit>
 #include <QSpinBox>
 #include <QDialogButtonBox>
+#include <QTextEdit>
+
+// TaskDetailsDialog 实现
+TaskDetailsDialog::TaskDetailsDialog(const Task& task, QWidget* parent)
+    : QDialog(parent), task(task) {
+    setWindowTitle("任务详情");
+    setModal(true);
+    setMinimumWidth(400);
+    setMinimumHeight(300);
+
+    QVBoxLayout* layout = new QVBoxLayout(this);
+
+    // 标题
+    QLabel* titleLabel = new QLabel("标题:", this);
+    titleEdit = new QLineEdit(this);
+    titleEdit->setText(task.title);
+    layout->addWidget(titleLabel);
+    layout->addWidget(titleEdit);
+
+    // 描述
+    QLabel* descLabel = new QLabel("描述:", this);
+    descriptionEdit = new QLineEdit(this);
+    descriptionEdit->setText(task.description);
+    layout->addWidget(descLabel);
+    layout->addWidget(descriptionEdit);
+
+    // 详情
+    QLabel* detailsLabel = new QLabel("详情:", this);
+    detailsEdit = new QTextEdit(this);
+    detailsEdit->setText(task.details);
+    layout->addWidget(detailsLabel);
+    layout->addWidget(detailsEdit);
+
+    // 进度
+    QLabel* progressLabel = new QLabel("进度 (0-100):", this);
+    progressSpinBox = new QSpinBox(this);
+    progressSpinBox->setMinimum(0);
+    progressSpinBox->setMaximum(100);
+    progressSpinBox->setValue(task.progress);
+    progressSpinBox->setSuffix("%");
+    layout->addWidget(progressLabel);
+    layout->addWidget(progressSpinBox);
+
+    // 按钮
+    QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
+    connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
+    connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
+    layout->addWidget(buttonBox);
+
+    setLayout(layout);
+}
+
+Task TaskDetailsDialog::getTask() const {
+    Task result = task;
+    result.title = titleEdit->text();
+    result.description = descriptionEdit->text();
+    result.details = detailsEdit->toPlainText();
+    result.progress = progressSpinBox->value();
+    return result;
+}
 
 // EditTaskDialog 实现
 EditTaskDialog::EditTaskDialog(const QString& description, int progress, QWidget* parent)
@@ -182,6 +242,12 @@ void MainWindow::setupUI() {
     downButton = new QPushButton("↓ 下移", this);
     connect(downButton, &QPushButton::clicked, this, &MainWindow::onMoveDown);
     buttonLayout->addWidget(downButton);
+
+    buttonLayout->addSpacing(20);
+
+    detailsButton = new QPushButton("详情", this);
+    connect(detailsButton, &QPushButton::clicked, this, &MainWindow::onViewTaskDetails);
+    buttonLayout->addWidget(detailsButton);
 
     mainLayout->addLayout(buttonLayout);
 
