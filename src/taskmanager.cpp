@@ -75,6 +75,28 @@ void TaskManager::moveTaskDown(const QString& id) {
     }
 }
 
+void TaskManager::moveTaskToTop(const QString& id) {
+    for (int i = 0; i < tasks.size(); ++i) {
+        if (tasks[i].id == id) {
+            Task task = tasks[i];
+            tasks.removeAt(i);
+            tasks.insert(0, task);
+            return;
+        }
+    }
+}
+
+void TaskManager::moveTaskToBottom(const QString& id) {
+    for (int i = 0; i < tasks.size(); ++i) {
+        if (tasks[i].id == id) {
+            Task task = tasks[i];
+            tasks.removeAt(i);
+            tasks.append(task);
+            return;
+        }
+    }
+}
+
 void TaskManager::moveTaskToStatus(const QString& id, TaskStatus newStatus) {
     for (auto& task : tasks) {
         if (task.id == id) {
@@ -130,6 +152,22 @@ QString TaskManager::generateId() {
     return QUuid::createUuid().toString(QUuid::WithoutBraces);
 }
 
+QJsonObject Person::toJson() const {
+    QJsonObject obj;
+    obj["name"] = name;
+    obj["details"] = details;
+    obj["progress"] = progress;
+    return obj;
+}
+
+Person Person::fromJson(const QJsonObject& obj) {
+    Person person;
+    person.name = obj["name"].toString();
+    person.details = obj["details"].toString();
+    person.progress = obj["progress"].toInt(0);
+    return person;
+}
+
 QJsonObject Task::toJson() const {
     QJsonObject obj;
     obj["id"] = id;
@@ -138,6 +176,14 @@ QJsonObject Task::toJson() const {
     obj["details"] = details;
     obj["status"] = static_cast<int>(status);
     obj["progress"] = progress;
+
+    // 序列化人员列表
+    QJsonArray peopleArray;
+    for (const auto& person : people) {
+        peopleArray.append(person.toJson());
+    }
+    obj["people"] = peopleArray;
+
     return obj;
 }
 
@@ -149,5 +195,14 @@ Task Task::fromJson(const QJsonObject& obj) {
     task.details = obj["details"].toString();
     task.status = static_cast<TaskStatus>(obj["status"].toInt());
     task.progress = obj["progress"].toInt(0);
+
+    // 反序列化人员列表
+    QJsonArray peopleArray = obj["people"].toArray();
+    for (const auto& value : peopleArray) {
+        if (value.isObject()) {
+            task.people.append(Person::fromJson(value.toObject()));
+        }
+    }
+
     return task;
 }

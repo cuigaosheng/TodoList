@@ -11,35 +11,71 @@
 #include <QLineEdit>
 #include <QSpinBox>
 #include <QTextEdit>
+#include <QMap>
 #include "taskmanager.h"
 
-// 任务详情对话框
+// 任务详情对话框 - 显示人员列表和详情
 class TaskDetailsDialog : public QDialog {
     Q_OBJECT
 
 public:
-    TaskDetailsDialog(const Task& task, QWidget* parent = nullptr);
+    TaskDetailsDialog(Task& task, QWidget* parent = nullptr);
     Task getTask() const;
 
+private slots:
+    void onAddPerson();
+    void onDeletePerson(int index);
+    void onSelectPerson(int index);
+    void onNameChanged();
+    void onDetailsChanged();
+    void onProgressChanged(int value);
+
 private:
-    Task task;
+    void refreshPersonList();
+    void updatePersonDetails();
+
+    Task& task;
     QLineEdit* descriptionEdit;
     QTextEdit* detailsEdit;
     QSpinBox* progressSpinBox;
+    QWidget* personButtonsWidget;
+    QPushButton* addPersonButton;
+
+    // 右侧人员详情编辑区
+    QLineEdit* personNameEdit;
+    QTextEdit* personDetailsEdit;
+    QSpinBox* personProgressSpinBox;
+
+    int currentPersonIndex;
 };
 
-// 编辑任务对话框
-class EditTaskDialog : public QDialog {
+// 人员汇总对话框
+class PeopleSummaryDialog : public QDialog {
     Q_OBJECT
 
 public:
-    EditTaskDialog(const QString& description, int progress, QWidget* parent = nullptr);
-    QString getDescription() const;
-    int getProgress() const;
+    PeopleSummaryDialog(const TaskManager& taskManager, QWidget* parent = nullptr);
+
+private slots:
+    void onPersonSelected(const QString& personName);
 
 private:
-    QLineEdit* descriptionEdit;
+    void buildPeopleSummary();
+    void displayPersonTasks(const QString& personName);
+
+    const TaskManager& taskManager;
+    QWidget* peopleButtonsWidget;
+    QListWidget* tasksListWidget;
+    QTextEdit* detailsEdit;
     QSpinBox* progressSpinBox;
+
+    // 数据结构: map<人名, vector<{任务描述, 工作安排, 进度}>>
+    struct PersonTaskInfo {
+        QString taskDescription;
+        QString details;
+        int progress;
+    };
+    QMap<QString, QVector<PersonTaskInfo>> peopleSummary;
 };
 
 // 自定义委托用于绘制任务项
@@ -67,10 +103,13 @@ private slots:
     void onEditTask();
     void onMoveUp();
     void onMoveDown();
+    void onMoveToTop();
+    void onMoveToBottom();
     void onTaskDoubleClicked(QListWidgetItem* item);
     void onTaskSelectionChanged();
     void onStatusFilterChanged(int index);
     void onViewTaskDetails();
+    void onViewPeopleSummary();
 
 private:
     void setupUI();
@@ -80,7 +119,6 @@ private:
     QString getStatusString(TaskStatus status) const;
     QListWidgetItem* createTaskItem(const Task& task, int index = 0);
     void moveTaskToStatus(const QString& taskId, TaskStatus newStatus);
-    void editTaskProgress(const QString& taskId);
 
     TaskManager taskManager;
     QString dataFile;
@@ -91,7 +129,10 @@ private:
     QPushButton* deleteButton;
     QPushButton* upButton;
     QPushButton* downButton;
+    QPushButton* topButton;
+    QPushButton* bottomButton;
     QPushButton* detailsButton;
+    QPushButton* peopleButton;
 };
 
 #endif // MAINWINDOW_H

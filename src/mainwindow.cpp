@@ -16,47 +16,121 @@
 #include <QTextEdit>
 #include <QTextEdit>
 
-// TaskDetailsDialog 实现
-TaskDetailsDialog::TaskDetailsDialog(const Task& task, QWidget* parent)
-    : QDialog(parent), task(task) {
-    setWindowTitle("任务详情");
+// TaskDetailsDialog 实现 - 纵向单列布局
+TaskDetailsDialog::TaskDetailsDialog(Task& task, QWidget* parent)
+    : QDialog(parent), task(task), currentPersonIndex(-1) {
+    setWindowTitle("任务详情 - 人员管理");
     setModal(true);
-    setMinimumWidth(400);
-    setMinimumHeight(300);
+    setMinimumWidth(600);
+    setMinimumHeight(500);
 
-    QVBoxLayout* layout = new QVBoxLayout(this);
+    QVBoxLayout* mainLayout = new QVBoxLayout(this);
+
+    // 上部：任务基本信息
+    QVBoxLayout* taskInfoLayout = new QVBoxLayout();
 
     // 描述
     QLabel* descLabel = new QLabel("描述:", this);
     descriptionEdit = new QLineEdit(this);
     descriptionEdit->setText(task.description);
-    layout->addWidget(descLabel);
-    layout->addWidget(descriptionEdit);
+    taskInfoLayout->addWidget(descLabel);
+    taskInfoLayout->addWidget(descriptionEdit);
 
     // 详情
     QLabel* detailsLabel = new QLabel("详情:", this);
     detailsEdit = new QTextEdit(this);
     detailsEdit->setText(task.details);
-    layout->addWidget(detailsLabel);
-    layout->addWidget(detailsEdit);
+    detailsEdit->setMinimumHeight(40);
+    connect(detailsEdit, &QTextEdit::textChanged, this, [this]() {
+        int height = qMin(200, (int)detailsEdit->document()->size().height() + 10);
+        detailsEdit->setFixedHeight(height);
+    });
+    taskInfoLayout->addWidget(detailsLabel);
+    taskInfoLayout->addWidget(detailsEdit);
 
     // 进度
+    QHBoxLayout* progressLayout = new QHBoxLayout();
     QLabel* progressLabel = new QLabel("进度 (0-100):", this);
     progressSpinBox = new QSpinBox(this);
     progressSpinBox->setMinimum(0);
     progressSpinBox->setMaximum(100);
     progressSpinBox->setValue(task.progress);
     progressSpinBox->setSuffix("%");
-    layout->addWidget(progressLabel);
-    layout->addWidget(progressSpinBox);
+    progressLayout->addWidget(progressLabel);
+    progressLayout->addWidget(progressSpinBox);
+    progressLayout->addStretch();
+    taskInfoLayout->addLayout(progressLayout);
 
-    // 按钮
+    mainLayout->addLayout(taskInfoLayout);
+
+    // 中部：涉及人员（按钮行）
+    QHBoxLayout* peopleRowLayout = new QHBoxLayout();
+    QLabel* peopleLabel = new QLabel("涉及人员:", this);
+    peopleRowLayout->addWidget(peopleLabel);
+
+    personButtonsWidget = new QWidget(this);
+    QHBoxLayout* buttonsLayout = new QHBoxLayout(personButtonsWidget);
+    buttonsLayout->setContentsMargins(0, 0, 0, 0);
+    buttonsLayout->setSpacing(5);
+
+    // 动态添加人员按钮
+    for (int i = 0; i < task.people.size(); ++i) {
+        QPushButton* btn = new QPushButton(task.people[i].name, this);
+        btn->setProperty("index", i);
+        connect(btn, &QPushButton::clicked, this, [this, i]() { onSelectPerson(i); });
+        buttonsLayout->addWidget(btn);
+    }
+
+    addPersonButton = new QPushButton("添加", this);
+    addPersonButton->setMaximumWidth(50);
+    connect(addPersonButton, &QPushButton::clicked, this, &TaskDetailsDialog::onAddPerson);
+    buttonsLayout->addWidget(addPersonButton);
+    buttonsLayout->addStretch();
+
+    peopleRowLayout->addWidget(personButtonsWidget, 1);
+    mainLayout->addLayout(peopleRowLayout);
+
+    // 下部：人员详情编辑
+    QLabel* personNameLabel = new QLabel("人员名字:", this);
+    personNameEdit = new QLineEdit(this);
+    connect(personNameEdit, &QLineEdit::textChanged, this, &TaskDetailsDialog::onNameChanged);
+    mainLayout->addWidget(personNameLabel);
+    mainLayout->addWidget(personNameEdit);
+
+    QLabel* personDetailsLabel = new QLabel("工作安排:", this);
+    personDetailsEdit = new QTextEdit(this);
+    personDetailsEdit->setMinimumHeight(40);
+    connect(personDetailsEdit, &QTextEdit::textChanged, this, [this]() {
+        int height = qMin(200, (int)personDetailsEdit->document()->size().height() + 10);
+        personDetailsEdit->setFixedHeight(height);
+    });
+    connect(personDetailsEdit, &QTextEdit::textChanged, this, &TaskDetailsDialog::onDetailsChanged);
+    mainLayout->addWidget(personDetailsLabel);
+    mainLayout->addWidget(personDetailsEdit);
+
+    QHBoxLayout* personProgressLayout = new QHBoxLayout();
+    QLabel* personProgressLabel = new QLabel("进度 (0-100):", this);
+    personProgressSpinBox = new QSpinBox(this);
+    personProgressSpinBox->setMinimum(0);
+    personProgressSpinBox->setMaximum(100);
+    personProgressSpinBox->setSuffix("%");
+    connect(personProgressSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, &TaskDetailsDialog::onProgressChanged);
+    personProgressLayout->addWidget(personProgressLabel);
+    personProgressLayout->addWidget(personProgressSpinBox);
+    personProgressLayout->addStretch();
+    mainLayout->addLayout(personProgressLayout);
+
+    mainLayout->addStretch();
+
+    // 最下部：确定/取消按钮
     QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
-    layout->addWidget(buttonBox);
+    mainLayout->addWidget(buttonBox);
 
-    setLayout(layout);
+    setLayout(mainLayout);
+    onSelectPerson(0);
 }
 
 Task TaskDetailsDialog::getTask() const {
@@ -67,47 +141,284 @@ Task TaskDetailsDialog::getTask() const {
     return result;
 }
 
-// EditTaskDialog 实现
-EditTaskDialog::EditTaskDialog(const QString& description, int progress, QWidget* parent)
-    : QDialog(parent) {
-    setWindowTitle("编辑任务");
+void TaskDetailsDialog::refreshPersonList() {
+    // 清空旧按钮
+    QLayout* layout = personButtonsWidget->layout();
+    QBoxLayout* boxLayout = qobject_cast<QBoxLayout*>(layout);
+
+    while (QLayoutItem* item = boxLayout->takeAt(0)) {
+        if (item->widget() && item->widget() != addPersonButton) {
+            delete item->widget();
+        }
+        delete item;
+    }
+
+    // 重新添加人员按钮
+    for (int i = 0; i < task.people.size(); ++i) {
+        QPushButton* btn = new QPushButton(task.people[i].name, this);
+        btn->setProperty("index", i);
+        connect(btn, &QPushButton::clicked, this, [this, i]() { onSelectPerson(i); });
+        boxLayout->insertWidget(i, btn);
+    }
+
+    boxLayout->insertWidget(task.people.size(), addPersonButton);
+    boxLayout->addStretch();
+}
+
+void TaskDetailsDialog::onAddPerson() {
+    bool ok;
+    QString name = QInputDialog::getText(this, "添加人员", "人员名字:",
+                                         QLineEdit::Normal, "", &ok);
+    if (!ok || name.isEmpty()) {
+        return;
+    }
+
+    Person newPerson;
+    newPerson.name = name;
+    newPerson.details = "";
+    newPerson.progress = 0;
+    task.people.append(newPerson);
+    refreshPersonList();
+    onSelectPerson(task.people.size() - 1);
+}
+
+void TaskDetailsDialog::onDeletePerson(int index) {
+    if (index < 0 || index >= task.people.size()) {
+        return;
+    }
+
+    int ret = QMessageBox::question(this, "确认删除", "确定要删除这个人员吗?");
+    if (ret == QMessageBox::Yes) {
+        task.people.removeAt(index);
+        refreshPersonList();
+        if (currentPersonIndex >= task.people.size()) {
+            currentPersonIndex = task.people.size() - 1;
+        }
+        if (currentPersonIndex >= 0) {
+            onSelectPerson(currentPersonIndex);
+        } else {
+            personNameEdit->clear();
+            personDetailsEdit->clear();
+            personNameEdit->setEnabled(false);
+            personDetailsEdit->setEnabled(false);
+        }
+    }
+}
+
+void TaskDetailsDialog::onSelectPerson(int index) {
+    if (index < 0 || index >= task.people.size()) {
+        currentPersonIndex = -1;
+        personNameEdit->clear();
+        personDetailsEdit->clear();
+        personProgressSpinBox->setValue(0);
+        personNameEdit->setEnabled(false);
+        personDetailsEdit->setEnabled(false);
+        personProgressSpinBox->setEnabled(false);
+        return;
+    }
+
+    currentPersonIndex = index;
+    personNameEdit->setEnabled(true);
+    personDetailsEdit->setEnabled(true);
+    personProgressSpinBox->setEnabled(true);
+
+    personNameEdit->blockSignals(true);
+    personDetailsEdit->blockSignals(true);
+    personProgressSpinBox->blockSignals(true);
+
+    personNameEdit->setText(task.people[index].name);
+    personDetailsEdit->setText(task.people[index].details);
+    personProgressSpinBox->setValue(task.people[index].progress);
+
+    personNameEdit->blockSignals(false);
+    personDetailsEdit->blockSignals(false);
+    personProgressSpinBox->blockSignals(false);
+}
+
+void TaskDetailsDialog::onNameChanged() {
+    if (currentPersonIndex >= 0 && currentPersonIndex < task.people.size()) {
+        task.people[currentPersonIndex].name = personNameEdit->text();
+        refreshPersonList();
+    }
+}
+
+void TaskDetailsDialog::onDetailsChanged() {
+    if (currentPersonIndex >= 0 && currentPersonIndex < task.people.size()) {
+        task.people[currentPersonIndex].details = personDetailsEdit->toPlainText();
+    }
+}
+
+void TaskDetailsDialog::onProgressChanged(int value) {
+    if (currentPersonIndex >= 0 && currentPersonIndex < task.people.size()) {
+        task.people[currentPersonIndex].progress = value;
+        refreshPersonList();
+    }
+}
+
+// PeopleSummaryDialog 实现
+PeopleSummaryDialog::PeopleSummaryDialog(const TaskManager& taskManager, QWidget* parent)
+    : QDialog(parent), taskManager(taskManager) {
+    setWindowTitle("人员汇总");
     setModal(true);
-    setMinimumWidth(300);
+    setMinimumWidth(800);
+    setMinimumHeight(600);
 
-    QVBoxLayout* layout = new QVBoxLayout(this);
+    QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
-    // 描述输入
-    QLabel* descLabel = new QLabel("任务描述:", this);
-    descriptionEdit = new QLineEdit(this);
-    descriptionEdit->setText(description);
-    layout->addWidget(descLabel);
-    layout->addWidget(descriptionEdit);
+    // 上部：人员按钮行
+    QLabel* peopleLabel = new QLabel("所有人员:", this);
+    mainLayout->addWidget(peopleLabel);
 
-    // 进度输入
-    QLabel* progressLabel = new QLabel("进度 (0-100):", this);
+    peopleButtonsWidget = new QWidget(this);
+    QHBoxLayout* buttonsLayout = new QHBoxLayout(peopleButtonsWidget);
+    buttonsLayout->setContentsMargins(0, 0, 0, 0);
+    buttonsLayout->setSpacing(5);
+    peopleButtonsWidget->setLayout(buttonsLayout);
+    mainLayout->addWidget(peopleButtonsWidget);
+
+    // 中部：任务列表
+    QLabel* tasksLabel = new QLabel("该人员的任务:", this);
+    tasksListWidget = new QListWidget(this);
+    tasksListWidget->setMaximumHeight(150);
+    connect(tasksListWidget, &QListWidget::itemSelectionChanged,
+            this, [this]() {
+                if (tasksListWidget->currentRow() >= 0) {
+                    // 找到当前选中的人员
+                    QLayout* layout = peopleButtonsWidget->layout();
+                    for (int i = 0; i < layout->count(); ++i) {
+                        QPushButton* btn = qobject_cast<QPushButton*>(layout->itemAt(i)->widget());
+                        if (btn && btn->isChecked()) {
+                            QString personName = btn->text();
+                            int row = tasksListWidget->currentRow();
+                            if (peopleSummary.contains(personName) && row < peopleSummary[personName].size()) {
+                                const PersonTaskInfo& info = peopleSummary[personName][row];
+                                detailsEdit->setPlainText(info.details);
+                                progressSpinBox->setValue(info.progress);
+                            }
+                            break;
+                        }
+                    }
+                }
+            });
+    mainLayout->addWidget(tasksLabel);
+    mainLayout->addWidget(tasksListWidget);
+
+    // 工作安排（只读）
+    QLabel* detailsLabel = new QLabel("工作安排:", this);
+    detailsEdit = new QTextEdit(this);
+    detailsEdit->setReadOnly(true);
+    detailsEdit->setMaximumHeight(150);
+    mainLayout->addWidget(detailsLabel);
+    mainLayout->addWidget(detailsEdit);
+
+    // 进度（只读）
+    QHBoxLayout* progressLayout = new QHBoxLayout();
+    QLabel* progressLabel = new QLabel("进度:", this);
     progressSpinBox = new QSpinBox(this);
     progressSpinBox->setMinimum(0);
     progressSpinBox->setMaximum(100);
-    progressSpinBox->setValue(progress);
     progressSpinBox->setSuffix("%");
-    layout->addWidget(progressLabel);
-    layout->addWidget(progressSpinBox);
+    progressSpinBox->setReadOnly(true);
+    progressLayout->addWidget(progressLabel);
+    progressLayout->addWidget(progressSpinBox);
+    progressLayout->addStretch();
+    mainLayout->addLayout(progressLayout);
 
-    // 按钮
-    QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
-    connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
-    connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
-    layout->addWidget(buttonBox);
+    mainLayout->addStretch();
 
-    setLayout(layout);
+    // 关闭按钮
+    QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Close, this);
+    connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::accept);
+    mainLayout->addWidget(buttonBox);
+
+    setLayout(mainLayout);
+
+    buildPeopleSummary();
 }
 
-QString EditTaskDialog::getDescription() const {
-    return descriptionEdit->text();
+void PeopleSummaryDialog::buildPeopleSummary() {
+    peopleSummary.clear();
+
+    // 遍历所有任务，按人名分组
+    QVector<Task> allTasks = taskManager.getAllTasks();
+    for (const auto& task : allTasks) {
+        for (const auto& person : task.people) {
+            PersonTaskInfo info;
+            info.taskDescription = task.description;
+            info.details = person.details;
+            info.progress = person.progress;
+
+            if (!peopleSummary.contains(person.name)) {
+                peopleSummary[person.name] = QVector<PersonTaskInfo>();
+            }
+            peopleSummary[person.name].append(info);
+        }
+    }
+
+    // 按名字排序并创建按钮
+    QStringList names = peopleSummary.keys();
+    std::sort(names.begin(), names.end());
+
+    QLayout* layout = peopleButtonsWidget->layout();
+    for (const auto& name : names) {
+        QPushButton* btn = new QPushButton(name, this);
+        btn->setCheckable(true);
+        connect(btn, &QPushButton::clicked, this, [this, name]() {
+            // 取消其他按钮的选中状态
+            QLayout* layout = peopleButtonsWidget->layout();
+            for (int i = 0; i < layout->count(); ++i) {
+                QPushButton* otherBtn = qobject_cast<QPushButton*>(layout->itemAt(i)->widget());
+                if (otherBtn && otherBtn != sender()) {
+                    otherBtn->setChecked(false);
+                }
+            }
+            onPersonSelected(name);
+        });
+        layout->addWidget(btn);
+    }
+
+    // 添加伸缩空间
+    QBoxLayout* boxLayout = qobject_cast<QBoxLayout*>(layout);
+    if (boxLayout) {
+        boxLayout->addStretch();
+    }
+
+    // 默认选中第一个人员
+    if (names.size() > 0) {
+        QLayout* layout = peopleButtonsWidget->layout();
+        QPushButton* firstBtn = qobject_cast<QPushButton*>(layout->itemAt(0)->widget());
+        if (firstBtn) {
+            firstBtn->setChecked(true);
+            onPersonSelected(names[0]);
+        }
+    }
 }
 
-int EditTaskDialog::getProgress() const {
-    return progressSpinBox->value();
+void PeopleSummaryDialog::onPersonSelected(const QString& personName) {
+    tasksListWidget->clear();
+    detailsEdit->clear();
+    progressSpinBox->setValue(0);
+
+    displayPersonTasks(personName);
+}
+
+void PeopleSummaryDialog::displayPersonTasks(const QString& personName) {
+    if (!peopleSummary.contains(personName)) {
+        return;
+    }
+
+    const auto& tasks = peopleSummary[personName];
+    for (const auto& info : tasks) {
+        tasksListWidget->addItem(info.taskDescription);
+    }
+
+    // 默认选中第一个任务
+    if (tasksListWidget->count() > 0) {
+        tasksListWidget->setCurrentRow(0);
+        const PersonTaskInfo& info = tasks[0];
+        detailsEdit->setPlainText(info.details);
+        progressSpinBox->setValue(info.progress);
+    }
 }
 
 // TaskItemDelegate 实现
@@ -232,15 +543,27 @@ void MainWindow::setupUI() {
     connect(upButton, &QPushButton::clicked, this, &MainWindow::onMoveUp);
     buttonLayout->addWidget(upButton);
 
+    topButton = new QPushButton("⇈ 最前", this);
+    connect(topButton, &QPushButton::clicked, this, &MainWindow::onMoveToTop);
+    buttonLayout->addWidget(topButton);
+
     downButton = new QPushButton("↓ 下移", this);
     connect(downButton, &QPushButton::clicked, this, &MainWindow::onMoveDown);
     buttonLayout->addWidget(downButton);
+
+    bottomButton = new QPushButton("⇉ 最后", this);
+    connect(bottomButton, &QPushButton::clicked, this, &MainWindow::onMoveToBottom);
+    buttonLayout->addWidget(bottomButton);
 
     buttonLayout->addSpacing(20);
 
     detailsButton = new QPushButton("详情", this);
     connect(detailsButton, &QPushButton::clicked, this, &MainWindow::onViewTaskDetails);
     buttonLayout->addWidget(detailsButton);
+
+    peopleButton = new QPushButton("人员汇总", this);
+    connect(peopleButton, &QPushButton::clicked, this, &MainWindow::onViewPeopleSummary);
+    buttonLayout->addWidget(peopleButton);
 
     mainLayout->addLayout(buttonLayout);
 
@@ -393,35 +716,8 @@ void MainWindow::onEditTask() {
     refreshTaskList();
 }
 
-void MainWindow::editTaskProgress(const QString& taskId) {
-    Task task = taskManager.getTask(taskId);
-    if (task.id.isEmpty()) {
-        return;
-    }
-
-    EditTaskDialog dialog(task.description, task.progress, this);
-    if (dialog.exec() == QDialog::Accepted) {
-        task.description = dialog.getDescription();
-        task.progress = dialog.getProgress();
-
-        // 根据进度自动改变状态
-        if (task.progress == 0) {
-            task.status = TaskStatus::Todo;
-        } else if (task.progress == 100) {
-            task.status = TaskStatus::Done;
-        } else {
-            task.status = TaskStatus::InProgress;
-        }
-
-        taskManager.updateTask(task);
-        saveTasks();
-        refreshTaskList();
-    }
-}
-
 void MainWindow::onTaskDoubleClicked(QListWidgetItem* item) {
-    QString id = item->data(Qt::UserRole).toString();
-    editTaskProgress(id);
+    // 双击不做任何操作
 }
 
 void MainWindow::onMoveUp() {
@@ -464,12 +760,55 @@ void MainWindow::onMoveDown() {
     }
 }
 
+void MainWindow::onMoveToTop() {
+    QListWidgetItem* item = taskListWidget->currentItem();
+    if (!item) {
+        return;
+    }
+
+    QString id = item->data(Qt::UserRole).toString();
+    taskManager.moveTaskToTop(id);
+    saveTasks();
+    refreshTaskList();
+
+    // 重新选中该项
+    for (int i = 0; i < taskListWidget->count(); ++i) {
+        if (taskListWidget->item(i)->data(Qt::UserRole).toString() == id) {
+            taskListWidget->setCurrentRow(i);
+            break;
+        }
+    }
+}
+
+void MainWindow::onMoveToBottom() {
+    QListWidgetItem* item = taskListWidget->currentItem();
+    if (!item) {
+        return;
+    }
+
+    QString id = item->data(Qt::UserRole).toString();
+    taskManager.moveTaskToBottom(id);
+    saveTasks();
+    refreshTaskList();
+
+    // 重新选中该项
+    for (int i = 0; i < taskListWidget->count(); ++i) {
+        if (taskListWidget->item(i)->data(Qt::UserRole).toString() == id) {
+            taskListWidget->setCurrentRow(i);
+            break;
+        }
+    }
+}
+
 void MainWindow::onTaskSelectionChanged() {
     bool hasSelection = taskListWidget->currentItem() != nullptr;
     deleteButton->setEnabled(hasSelection);
     upButton->setEnabled(hasSelection);
     downButton->setEnabled(hasSelection);
+    topButton->setEnabled(hasSelection);
+    bottomButton->setEnabled(hasSelection);
     detailsButton->setEnabled(hasSelection);
+    // peopleButton 不需要选中任务，始终启用
 }
 
 void MainWindow::onViewTaskDetails() {
@@ -482,9 +821,24 @@ void MainWindow::onViewTaskDetails() {
     QString id = item->data(Qt::UserRole).toString();
     Task task = taskManager.getTask(id);
 
+    // 如果没有人员列表但有详情，临时为旧任务创建"甲"人员
+    bool isLegacyTask = task.people.isEmpty() && !task.details.isEmpty();
+    if (isLegacyTask) {
+        Person defaultPerson;
+        defaultPerson.name = "甲";
+        defaultPerson.details = task.details;
+        defaultPerson.progress = 0;
+        task.people.append(defaultPerson);
+    }
+
     TaskDetailsDialog dialog(task, this);
     if (dialog.exec() == QDialog::Accepted) {
         Task updatedTask = dialog.getTask();
+
+        // 如果是旧任务，将"甲"的详情写回到 task.details
+        if (isLegacyTask && !updatedTask.people.isEmpty()) {
+            updatedTask.details = updatedTask.people[0].details;
+        }
 
         // 根据进度自动改变状态
         if (updatedTask.progress == 0) {
@@ -503,6 +857,11 @@ void MainWindow::onViewTaskDetails() {
 
 void MainWindow::onStatusFilterChanged(int index) {
     refreshTaskList();
+}
+
+void MainWindow::onViewPeopleSummary() {
+    PeopleSummaryDialog dialog(taskManager, this);
+    dialog.exec();
 }
 
 void MainWindow::moveTaskToStatus(const QString& taskId, TaskStatus newStatus) {

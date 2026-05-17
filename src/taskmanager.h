@@ -19,6 +19,8 @@ public:
 
     void moveTaskUp(const QString& id);
     void moveTaskDown(const QString& id);
+    void moveTaskToTop(const QString& id);
+    void moveTaskToBottom(const QString& id);
     void moveTaskToStatus(const QString& id, TaskStatus newStatus);
 
     bool loadFromFile(const QString& filename);
