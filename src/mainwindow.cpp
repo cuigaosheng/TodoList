@@ -14,9 +14,253 @@
 #include <QSpinBox>
 #include <QDialogButtonBox>
 #include <QTextEdit>
-#include <QTextEdit>
+#include <QSplitter>
+#include <QTextBrowser>
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QNetworkReply>
+#include <QUrl>
+#include <QUrlQuery>
+#include <QCryptographicHash>
+#include <QJsonDocument>
+#include <QJsonObject>
 
-// TaskDetailsDialog 实现 - 纵向单列布局
+// AddParcelDialog 实现
+AddParcelDialog::AddParcelDialog(QWidget* parent)
+    : QDialog(parent) {
+    setWindowTitle("添加快递");
+    setModal(true);
+    setMinimumWidth(500);
+    setMinimumHeight(350);
+
+    QVBoxLayout* mainLayout = new QVBoxLayout(this);
+
+    // 快递单号
+    QLabel* numberLabel = new QLabel("快递单号:", this);
+    numberEdit = new QLineEdit(this);
+    mainLayout->addWidget(numberLabel);
+    mainLayout->addWidget(numberEdit);
+
+    // 快递公司（预设）
+    QLabel* companyLabel = new QLabel("快递公司（预设）:", this);
+    companyCombo = new QComboBox(this);
+    companyCombo->addItem("京东", "jd");
+    companyCombo->addItem("顺丰", "sf");
+    companyCombo->addItem("圆通", "yt");
+    companyCombo->addItem("申通", "sto");
+    companyCombo->addItem("韵达", "yto");
+    companyCombo->addItem("中通", "zto");
+    companyCombo->addItem("EMS", "ems");
+    companyCombo->addItem("极兔", "jt");
+    companyCombo->addItem("德邦", "db");
+    mainLayout->addWidget(companyLabel);
+    mainLayout->addWidget(companyCombo);
+
+    // 公司代码（手动输入，用于测试）
+    QLabel* codeLabel = new QLabel("公司代码（如上面找不到，手动输入）:", this);
+    companyCodeEdit = new QLineEdit(this);
+    companyCodeEdit->setPlaceholderText("例如: sf, yt, zto, sto, jd, yto, ems, jt, db");
+    mainLayout->addWidget(codeLabel);
+    mainLayout->addWidget(companyCodeEdit);
+
+    // 备注
+    QLabel* aliasLabel = new QLabel("备注:", this);
+    aliasEdit = new QLineEdit(this);
+    mainLayout->addWidget(aliasLabel);
+    mainLayout->addWidget(aliasEdit);
+
+    mainLayout->addStretch();
+
+    // 按钮
+    QDialogButtonBox* buttonBox = new QDialogButtonBox(
+        QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
+    connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
+    connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
+    mainLayout->addWidget(buttonBox);
+}
+
+Parcel AddParcelDialog::getParcel() const {
+    Parcel p;
+    p.id = QString::number(QDateTime::currentMSecsSinceEpoch());
+    p.number = numberEdit->text();
+    // 优先使用手动输入的代码，否则使用下拉框选择的代码
+    p.company = companyCodeEdit->text().isEmpty() ?
+        companyCombo->currentData().toString() : companyCodeEdit->text();
+    p.alias = aliasEdit->text();
+    return p;
+}
+
+// ParcelManagerDialog 实现
+ParcelManagerDialog::ParcelManagerDialog(ParcelManager& manager, QWidget* parent)
+    : QDialog(parent), parcelManager(manager), currentParcelId("") {
+    setWindowTitle("快递管理");
+    setModal(true);
+    setMinimumWidth(700);
+    setMinimumHeight(500);
+
+    networkManager = new QNetworkAccessManager(this);
+    connect(networkManager, &QNetworkAccessManager::finished, this, &ParcelManagerDialog::onNetworkReplyFinished);
+
+    QVBoxLayout* mainLayout = new QVBoxLayout(this);
+
+    // 中间：分割器（左侧列表，右侧详情）
+    QSplitter* splitter = new QSplitter(Qt::Horizontal, this);
+
+    parcelListWidget = new QListWidget(this);
+    connect(parcelListWidget, &QListWidget::itemClicked, this, &ParcelManagerDialog::onParcelSelected);
+    splitter->addWidget(parcelListWidget);
+
+    detailsBrowser = new QTextBrowser(this);
+    detailsBrowser->setReadOnly(true);
+    splitter->addWidget(detailsBrowser);
+
+    splitter->setStretchFactor(0, 1);
+    splitter->setStretchFactor(1, 1);
+    mainLayout->addWidget(splitter);
+
+    // 底部：按钮
+    QHBoxLayout* buttonLayout = new QHBoxLayout();
+    addButton = new QPushButton("添加", this);
+    deleteButton = new QPushButton("删除", this);
+    connect(addButton, &QPushButton::clicked, this, &ParcelManagerDialog::onAddParcel);
+    connect(deleteButton, &QPushButton::clicked, this, &ParcelManagerDialog::onDeleteParcel);
+    buttonLayout->addWidget(addButton);
+    buttonLayout->addWidget(deleteButton);
+    buttonLayout->addStretch();
+
+    QPushButton* closeButton = new QPushButton("关闭", this);
+    connect(closeButton, &QPushButton::clicked, this, &QDialog::accept);
+    buttonLayout->addWidget(closeButton);
+
+    mainLayout->addLayout(buttonLayout);
+
+    refreshParcelList();
+}
+
+void ParcelManagerDialog::onAddParcel() {
+    AddParcelDialog dialog(this);
+    if (dialog.exec() == QDialog::Accepted) {
+        Parcel p = dialog.getParcel();
+        parcelManager.addParcel(p);
+        refreshParcelList();
+    }
+}
+
+void ParcelManagerDialog::onDeleteParcel() {
+    QListWidgetItem* item = parcelListWidget->currentItem();
+    if (!item) {
+        QMessageBox::warning(this, "警告", "请先选择一条快递");
+        return;
+    }
+    QString id = item->data(Qt::UserRole).toString();
+    parcelManager.removeParcel(id);
+    refreshParcelList();
+    detailsBrowser->clear();
+}
+
+void ParcelManagerDialog::onParcelSelected(QListWidgetItem* item) {
+    QString id = item->data(Qt::UserRole).toString();
+    currentParcelId = id;
+    Parcel p = parcelManager.getParcelById(id);
+    detailsBrowser->setText(QString("单号: %1\n公司: %2\n备注: %3\n\n加载中...").arg(p.number, p.company, p.alias));
+    queryParcelInfo(p);
+}
+
+void ParcelManagerDialog::refreshParcelList() {
+    parcelListWidget->clear();
+    QVector<Parcel> parcels = parcelManager.getAllParcels();
+    for (const auto& p : parcels) {
+        QString text = QString("%1 (%2)").arg(p.number, p.alias.isEmpty() ? p.company : p.alias);
+        QListWidgetItem* item = new QListWidgetItem(text);
+        item->setData(Qt::UserRole, p.id);
+        parcelListWidget->addItem(item);
+    }
+}
+
+void ParcelManagerDialog::queryParcelInfo(const Parcel& parcel) {
+    // 快递100 API 凭证
+    QString customer = "RBGOVFUn3120";
+    QString key = "D72C0B6BFFA18091483209B267F5A3B0";
+
+    QJsonObject paramObj;
+    paramObj["com"] = parcel.company.toLower();  // 确保小写
+    paramObj["num"] = parcel.number;
+    QJsonDocument paramDoc(paramObj);
+    QString param = QString::fromUtf8(paramDoc.toJson(QJsonDocument::Compact));
+
+    // 尝试 sign = MD5(param + key + customer)
+    QString sign = calculateSign(param, key, customer);
+
+    // 显示调试信息
+    QString debugInfo = QString(
+        "<b>发送参数</b><br>"
+        "单号: %1<br>"
+        "公司代码: %2<br>"
+        "param JSON: %3<br>"
+        "sign: %4<br>"
+        "customer: %5<br><br>"
+        "查询中...")
+        .arg(parcel.number, parcel.company, param, sign, customer);
+    detailsBrowser->setHtml(debugInfo);
+
+    QUrl url("http://poll.kuaidi100.com/poll/query.do");
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+
+    QUrlQuery query;
+    query.addQueryItem("param", param);
+    query.addQueryItem("customer", customer);
+    query.addQueryItem("sign", sign);
+
+    networkManager->post(request, query.toString(QUrl::FullyEncoded).toUtf8());
+}
+
+QString ParcelManagerDialog::calculateSign(const QString& param, const QString& key, const QString& customer) {
+    // sign = MD5(param + key + customer)
+    QString str = param + key + customer;
+    return QString::fromUtf8(QCryptographicHash::hash(str.toUtf8(), QCryptographicHash::Md5).toHex()).toUpper();
+}
+
+void ParcelManagerDialog::onNetworkReplyFinished(QNetworkReply* reply) {
+    if (reply->error() != QNetworkReply::NoError) {
+        detailsBrowser->setText(QString("查询失败: %1").arg(reply->errorString()));
+        reply->deleteLater();
+        return;
+    }
+
+    QByteArray responseData = reply->readAll();
+    QJsonDocument doc = QJsonDocument::fromJson(responseData);
+    reply->deleteLater();
+
+    if (!doc.isObject()) {
+        detailsBrowser->setText("响应格式错误");
+        return;
+    }
+
+    QJsonObject obj = doc.object();
+    QString status = obj["status"].toString();
+    QString message = obj["message"].toString();
+
+    QString html = QString("<b>查询结果</b><br>状态: %1<br>信息: %2<br><br>").arg(status, message);
+
+    // 显示完整的 JSON 响应用于调试
+    html += QString("<b>原始响应</b><br><pre>%1</pre><br>").arg(QString::fromUtf8(responseData));
+
+    QJsonArray data = obj["data"].toArray();
+    if (!data.isEmpty()) {
+        html += "<b>物流轨迹</b><br>";
+        for (const auto& item : data) {
+            QJsonObject itemObj = item.toObject();
+            QString time = itemObj["time"].toString();
+            QString context = itemObj["context"].toString();
+            html += QString("%1 %2<br>").arg(time, context);
+        }
+    }
+
+    detailsBrowser->setHtml(html);
+}
+
+
 TaskDetailsDialog::TaskDetailsDialog(Task& task, QWidget* parent)
     : QDialog(parent), task(task), currentPersonIndex(-1) {
     setWindowTitle("任务详情 - 人员管理");
@@ -480,15 +724,18 @@ MainWindow::MainWindow(QWidget* parent)
     setGeometry(100, 100, 800, 600);
 
     dataFile = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/tasks.json";
+    parcelDataFile = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/parcels.json";
     QDir().mkpath(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation));
 
     setupUI();
     loadTasks();
+    parcelManager.loadFromFile(parcelDataFile);
     refreshTaskList();
 }
 
 MainWindow::~MainWindow() {
     saveTasks();
+    parcelManager.saveToFile(parcelDataFile);
 }
 
 void MainWindow::setupUI() {
@@ -564,6 +811,12 @@ void MainWindow::setupUI() {
     peopleButton = new QPushButton("人员汇总", this);
     connect(peopleButton, &QPushButton::clicked, this, &MainWindow::onViewPeopleSummary);
     buttonLayout->addWidget(peopleButton);
+
+    buttonLayout->addSpacing(10);
+
+    parcelsButton = new QPushButton("快递查询", this);
+    connect(parcelsButton, &QPushButton::clicked, this, &MainWindow::onViewParcels);
+    buttonLayout->addWidget(parcelsButton);
 
     mainLayout->addLayout(buttonLayout);
 
@@ -862,6 +1115,13 @@ void MainWindow::onStatusFilterChanged(int index) {
 void MainWindow::onViewPeopleSummary() {
     PeopleSummaryDialog dialog(taskManager, this);
     dialog.exec();
+}
+
+void MainWindow::onViewParcels() {
+    ParcelManagerDialog dialog(parcelManager, this);
+    if (dialog.exec() == QDialog::Accepted) {
+        parcelManager.saveToFile(parcelDataFile);
+    }
 }
 
 void MainWindow::moveTaskToStatus(const QString& taskId, TaskStatus newStatus) {

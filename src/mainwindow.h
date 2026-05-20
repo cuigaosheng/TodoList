@@ -12,7 +12,13 @@
 #include <QSpinBox>
 #include <QTextEdit>
 #include <QMap>
+#include <QSplitter>
+#include <QTextBrowser>
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QNetworkReply>
 #include "taskmanager.h"
+#include "parcelmanager.h"
 
 // 任务详情对话框 - 显示人员列表和详情
 class TaskDetailsDialog : public QDialog {
@@ -90,6 +96,48 @@ public:
                    const QModelIndex& index) const override;
 };
 
+// 添加快递对话框
+class AddParcelDialog : public QDialog {
+    Q_OBJECT
+
+public:
+    AddParcelDialog(QWidget* parent = nullptr);
+    Parcel getParcel() const;
+
+private:
+    QLineEdit* numberEdit;
+    QComboBox* companyCombo;
+    QLineEdit* companyCodeEdit;
+    QLineEdit* aliasEdit;
+};
+
+// 快递管理对话框
+class ParcelManagerDialog : public QDialog {
+    Q_OBJECT
+
+public:
+    ParcelManagerDialog(ParcelManager& manager, QWidget* parent = nullptr);
+
+private slots:
+    void onAddParcel();
+    void onDeleteParcel();
+    void onParcelSelected(QListWidgetItem* item);
+    void onNetworkReplyFinished(QNetworkReply* reply);
+
+private:
+    void refreshParcelList();
+    void queryParcelInfo(const Parcel& parcel);
+    QString calculateSign(const QString& param, const QString& key, const QString& customer);
+
+    ParcelManager& parcelManager;
+    QListWidget* parcelListWidget;
+    QTextBrowser* detailsBrowser;
+    QPushButton* addButton;
+    QPushButton* deleteButton;
+    QNetworkAccessManager* networkManager;
+    QString currentParcelId;
+};
+
 class MainWindow : public QMainWindow {
     Q_OBJECT
 
@@ -110,6 +158,7 @@ private slots:
     void onStatusFilterChanged(int index);
     void onViewTaskDetails();
     void onViewPeopleSummary();
+    void onViewParcels();
 
 private:
     void setupUI();
@@ -121,7 +170,9 @@ private:
     void moveTaskToStatus(const QString& taskId, TaskStatus newStatus);
 
     TaskManager taskManager;
+    ParcelManager parcelManager;
     QString dataFile;
+    QString parcelDataFile;
 
     QListWidget* taskListWidget;
     QComboBox* statusFilterCombo;
@@ -133,6 +184,7 @@ private:
     QPushButton* bottomButton;
     QPushButton* detailsButton;
     QPushButton* peopleButton;
+    QPushButton* parcelsButton;
 };
 
 #endif // MAINWINDOW_H
