@@ -336,19 +336,9 @@ TaskDetailsDialog::TaskDetailsDialog(Task& task, QWidget* parent)
     buttonsLayout->setContentsMargins(0, 0, 0, 0);
     buttonsLayout->setSpacing(5);
 
-    // 动态添加人员按钮
-    for (int i = 0; i < task.people.size(); ++i) {
-        QPushButton* btn = new QPushButton(task.people[i].name, this);
-        btn->setProperty("index", i);
-        connect(btn, &QPushButton::clicked, this, [this, i]() { onSelectPerson(i); });
-        buttonsLayout->addWidget(btn);
-    }
-
     addPersonButton = new QPushButton("添加", this);
     addPersonButton->setMaximumWidth(50);
     connect(addPersonButton, &QPushButton::clicked, this, &TaskDetailsDialog::onAddPerson);
-    buttonsLayout->addWidget(addPersonButton);
-    buttonsLayout->addStretch();
 
     peopleRowLayout->addWidget(personButtonsWidget, 1);
     mainLayout->addLayout(peopleRowLayout);
