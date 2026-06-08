@@ -473,7 +473,9 @@ void TaskDetailsDialog::onSelectPerson(int index) {
         currentPersonIndex = -1;
         personNameEdit->clear();
         personDetailsEdit->clear();
+        personProgressSpinBox->blockSignals(true);
         personProgressSpinBox->setValue(0);
+        personProgressSpinBox->blockSignals(false);
         personNameEdit->setEnabled(false);
         personDetailsEdit->setEnabled(false);
         personProgressSpinBox->setEnabled(false);
