@@ -433,7 +433,7 @@ void TaskDetailsDialog::refreshPersonList() {
         boxLayout->insertWidget(widgetPos++, delBtn);
     }
 
-    boxLayout->insertWidget(task.people.size(), addPersonButton);
+    boxLayout->insertWidget(widgetPos, addPersonButton);
     boxLayout->addStretch();
 }
 
