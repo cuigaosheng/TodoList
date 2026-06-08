@@ -5,6 +5,8 @@
 #include <QMessageBox>
 #include <QStandardPaths>
 #include <QDir>
+#include <QFile>
+#include <QDebug>
 #include <QApplication>
 #include <QColor>
 #include <QLabel>
@@ -824,11 +826,99 @@ void MainWindow::setupUI() {
 }
 
 void MainWindow::loadTasks() {
-    taskManager.loadFromFile(dataFile);
+    if (!taskManager.loadFromFile(dataFile)) {
+        qWarning() << "Failed to load tasks from" << dataFile;
+        qWarning() << "Attempting to restore from backup...";
+
+        // 尝试从备份文件恢复
+        if (QFile::exists(dataFile + ".bak")) {
+            if (taskManager.loadFromFile(dataFile + ".bak")) {
+                qInfo() << "Successfully restored from backup";
+                // 恢复了备份后，也应该保存到主文件
+                if (taskManager.saveToFile(dataFile)) {
+                    qInfo() << "Main file restored from backup";
+                }
+            } else {
+                qWarning() << "Backup file is also corrupted";
+            }
+        } else {
+            qWarning() << "No backup file found";
+        }
+    }
+}
+
+bool MainWindow::createBackup(const QString& filename) {
+    if (!QFile::exists(filename)) {
+        return true;  // 文件不存在，无需备份
+    }
+
+    QString backupFile = filename + ".bak";
+
+    // 删除旧备份
+    if (QFile::exists(backupFile)) {
+        if (!QFile::remove(backupFile)) {
+            qWarning() << "Failed to remove old backup:" << backupFile;
+            return false;
+        }
+    }
+
+    // 创建新备份
+    if (!QFile::copy(filename, backupFile)) {
+        qWarning() << "Failed to create backup:" << backupFile;
+        return false;
+    }
+
+    qDebug() << "Backup created:" << backupFile;
+    return true;
+}
+
+bool MainWindow::restoreBackup(const QString& filename) {
+    QString backupFile = filename + ".bak";
+
+    if (!QFile::exists(backupFile)) {
+        qWarning() << "Backup file not found:" << backupFile;
+        return false;
+    }
+
+    // 删除损坏的文件
+    if (QFile::exists(filename)) {
+        if (!QFile::remove(filename)) {
+            qWarning() << "Failed to remove corrupted file:" << filename;
+            return false;
+        }
+    }
+
+    // 恢复备份
+    if (!QFile::copy(backupFile, filename)) {
+        qWarning() << "Failed to restore backup from:" << backupFile;
+        return false;
+    }
+
+    qInfo() << "File restored from backup:" << filename;
+    return true;
 }
 
 void MainWindow::saveTasks() {
-    taskManager.saveToFile(dataFile);
+    // 防止用空任务列表覆盖已有文件
+    if (taskManager.getAllTasks().isEmpty() && QFile::exists(dataFile)) {
+        qWarning() << "Refusing to save empty task list - would delete data!";
+        return;
+    }
+
+    // 保存前先创建备份
+    if (!createBackup(dataFile)) {
+        qCritical() << "Failed to create backup, aborting save to prevent data loss";
+        return;
+    }
+
+    // 尝试保存
+    if (!taskManager.saveToFile(dataFile)) {
+        qCritical() << "Failed to save tasks, restoring from backup";
+        restoreBackup(dataFile);
+        return;
+    }
+
+    qDebug() << "Tasks saved successfully";
 }
 
 void MainWindow::refreshTaskList() {

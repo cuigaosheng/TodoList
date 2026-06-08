@@ -168,6 +168,8 @@ private:
     QString getStatusString(TaskStatus status) const;
     QListWidgetItem* createTaskItem(const Task& task, int index = 0);
     void moveTaskToStatus(const QString& taskId, TaskStatus newStatus);
+    bool createBackup(const QString& filename);
+    bool restoreBackup(const QString& filename);
 
     TaskManager taskManager;
     ParcelManager parcelManager;
