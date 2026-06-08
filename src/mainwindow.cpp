@@ -429,26 +429,9 @@ void TaskDetailsDialog::onAddPerson() {
 }
 
 void TaskDetailsDialog::onDeletePerson(int index) {
-    if (index < 0 || index >= task.people.size()) {
-        return;
-    }
-
-    int ret = QMessageBox::question(this, "确认删除", "确定要删除这个人员吗?");
-    if (ret == QMessageBox::Yes) {
-        task.people.removeAt(index);
-        refreshPersonList();
-        if (currentPersonIndex >= task.people.size()) {
-            currentPersonIndex = task.people.size() - 1;
-        }
-        if (currentPersonIndex >= 0) {
-            onSelectPerson(currentPersonIndex);
-        } else {
-            personNameEdit->clear();
-            personDetailsEdit->clear();
-            personNameEdit->setEnabled(false);
-            personDetailsEdit->setEnabled(false);
-        }
-    }
+    // 删除人员功能已禁用 - 不允许删除人员
+    Q_UNUSED(index);
+    QMessageBox::information(this, "提示", "不能删除人员");
 }
 
 void TaskDetailsDialog::onSelectPerson(int index) {
