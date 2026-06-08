@@ -383,6 +383,7 @@ TaskDetailsDialog::TaskDetailsDialog(Task& task, QWidget* parent)
     mainLayout->addWidget(buttonBox);
 
     setLayout(mainLayout);
+    refreshPersonList();
     onSelectPerson(0);
 }
 
