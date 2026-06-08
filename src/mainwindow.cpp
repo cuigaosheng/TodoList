@@ -416,12 +416,21 @@ void TaskDetailsDialog::refreshPersonList() {
         delete item;
     }
 
-    // 重新添加人员按钮
+    // 重新添加人员按钮（每个人员一个名字按钮 + 一个×删除按钮）
+    int widgetPos = 0;
     for (int i = 0; i < task.people.size(); ++i) {
-        PersonButton* btn = new PersonButton(task.people[i].name, i, this);
-        connect(btn, &QPushButton::clicked, this, [this, i]() { onSelectPerson(i); });
-        connect(btn, &PersonButton::deleteRequested, this, &TaskDetailsDialog::onDeletePerson);
-        boxLayout->insertWidget(i, btn);
+        QPushButton* nameBtn = new QPushButton(task.people[i].name, this);
+        nameBtn->setProperty("index", i);
+        connect(nameBtn, &QPushButton::clicked, this, [this, i]() { onSelectPerson(i); });
+        boxLayout->insertWidget(widgetPos++, nameBtn);
+
+        QPushButton* delBtn = new QPushButton("×", this);
+        delBtn->setMaximumWidth(22);
+        delBtn->setMaximumHeight(22);
+        delBtn->setToolTip("删除该人员");
+        delBtn->setStyleSheet("QPushButton { color: red; font-weight: bold; padding: 0; }");
+        connect(delBtn, &QPushButton::clicked, this, [this, i]() { onDeletePerson(i); });
+        boxLayout->insertWidget(widgetPos++, delBtn);
     }
 
     boxLayout->insertWidget(task.people.size(), addPersonButton);
