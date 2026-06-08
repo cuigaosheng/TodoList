@@ -96,6 +96,24 @@ public:
                    const QModelIndex& index) const override;
 };
 
+// 自定义人员按钮 - 支持右键删除
+class PersonButton : public QPushButton {
+    Q_OBJECT
+
+public:
+    PersonButton(const QString& name, int index, QWidget* parent = nullptr);
+    int getIndex() const { return personIndex; }
+
+signals:
+    void deleteRequested(int index);
+
+protected:
+    void contextMenuEvent(QContextMenuEvent* event) override;
+
+private:
+    int personIndex;
+};
+
 // 添加快递对话框
 class AddParcelDialog : public QDialog {
     Q_OBJECT

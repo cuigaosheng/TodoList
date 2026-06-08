@@ -26,6 +26,23 @@
 #include <QCryptographicHash>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QContextMenuEvent>
+#include <QMenu>
+
+// PersonButton 实现 - 支持右键菜单删除
+PersonButton::PersonButton(const QString& name, int index, QWidget* parent)
+    : QPushButton(name, parent), personIndex(index) {
+}
+
+void PersonButton::contextMenuEvent(QContextMenuEvent* event) {
+    QMenu menu(this);
+    QAction* deleteAction = menu.addAction("删除");
+    QAction* result = menu.exec(event->globalPos());
+
+    if (result == deleteAction) {
+        emit deleteRequested(personIndex);
+    }
+}
 
 // AddParcelDialog 实现
 AddParcelDialog::AddParcelDialog(QWidget* parent)
@@ -401,9 +418,9 @@ void TaskDetailsDialog::refreshPersonList() {
 
     // 重新添加人员按钮
     for (int i = 0; i < task.people.size(); ++i) {
-        QPushButton* btn = new QPushButton(task.people[i].name, this);
-        btn->setProperty("index", i);
+        PersonButton* btn = new PersonButton(task.people[i].name, i, this);
         connect(btn, &QPushButton::clicked, this, [this, i]() { onSelectPerson(i); });
+        connect(btn, &PersonButton::deleteRequested, this, &TaskDetailsDialog::onDeletePerson);
         boxLayout->insertWidget(i, btn);
     }
 
@@ -429,9 +446,26 @@ void TaskDetailsDialog::onAddPerson() {
 }
 
 void TaskDetailsDialog::onDeletePerson(int index) {
-    // 删除人员功能已禁用 - 不允许删除人员
-    Q_UNUSED(index);
-    QMessageBox::information(this, "提示", "不能删除人员");
+    if (index < 0 || index >= task.people.size()) {
+        return;
+    }
+
+    int ret = QMessageBox::question(this, "确认删除", "确定要删除这个人员吗?");
+    if (ret == QMessageBox::Yes) {
+        task.people.removeAt(index);
+        refreshPersonList();
+        if (currentPersonIndex >= task.people.size()) {
+            currentPersonIndex = task.people.size() - 1;
+        }
+        if (currentPersonIndex >= 0) {
+            onSelectPerson(currentPersonIndex);
+        } else {
+            personNameEdit->clear();
+            personDetailsEdit->clear();
+            personNameEdit->setEnabled(false);
+            personDetailsEdit->setEnabled(false);
+        }
+    }
 }
 
 void TaskDetailsDialog::onSelectPerson(int index) {
